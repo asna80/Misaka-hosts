@@ -1,0 +1,14 @@
+# 手动补充的域名（每行一个，# 注释）
+#
+# 用途：geosite 和 11 个仓库都没覆盖到、但你知道需要固定 IP 的域名，写在这里。
+# 它会被无条件并入域名清单，然后照常走 DoH 解析 + 证书探测。
+#
+# 什么时候用：
+#   - 某个子域没被 geosite 的后缀规则覆盖（比如只有 store.xxx.com 被墙）
+#   - 你从 enum_subs.py 查到了一个 geosite 没有的主机名
+#   - 某个服务换了新域名，上游还没更新
+#
+# 示例（去掉行首的 # 才生效）：
+#   dl.example.com
+#   api.example.net
+#   store.example.org

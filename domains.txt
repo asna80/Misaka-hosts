@@ -1,0 +1,23 @@
+# 精确域名补充源：只取这些仓库里的「主机名」，忽略它们给的 IP。
+# 用途：geosite 是后缀语义（domain:steamcommunity.com 含所有子域），
+#       hosts 只能精确匹配，所以需要这些「人工写死的精确 FQDN」来补长尾。
+#
+# 格式：tier|名称|URL（tier 在这里只影响排序，不影响是否采信）
+#
+# 注意：zy-xyz 的 accelerate.txt 有 2.3 万条，其中大量是赌博/色情/死站，
+#       会把探测量从 2 万拉到 4 万以上。需要它时再手动加回最后一行。
+
+1|johyC|https://raw.githubusercontent.com/JohyC/Hosts/main/hosts.txt
+1|rocdk890|https://raw.githubusercontent.com/rocdk890/Hosts/refs/heads/master/hosts.txt
+1|steamhostsync|https://raw.githubusercontent.com/Clov614/SteamHostSync/main/Hosts
+1|github520|https://raw.githubusercontent.com/521xueweihan/GitHub520/main/hosts
+1|ineo6|https://raw.githubusercontent.com/ineo6/hosts/master/hosts
+1|maxiaof|https://raw.githubusercontent.com/maxiaof/github-hosts/master/hosts
+1|ittuann|https://raw.githubusercontent.com/ittuann/GitHub-IP-hosts/main/hosts
+1|caibingcheng|https://raw.githubusercontent.com/caibingcheng/hosts/main/dns/github
+1|ianzone|https://raw.githubusercontent.com/ianzone/clean-hosts/refs/heads/main/hosts
+1|varcli|https://raw.githubusercontent.com/varcli/hosts/refs/heads/main/hosts
+
+# 大表：2.3 万条，含赌博/色情/各类站点。死站会被 TLS 探测淘汰，
+# 但不会因为站点内容被删条目。本地过夜跑建议开着（探测时间够）。
+2|zyxyz|https://github.com/zy-xyz/hosts-rules/releases/latest/download/accelerate.txt

@@ -72,6 +72,17 @@ DOH_NEAR = [
     "https://jp-kix.doh.sb/dns-query",
 ]
 
+# 国内解析器：**只用于 @cn 标记的域名**（Steam 国内 CDN 这类）。
+# 这些域名不在墙内，国内解析器返回的是真实且就近的 IP；对被墙域名则会返回伪造地址，
+# 所以绝不能在通用路径上使用。
+DOH_CN = [
+    "https://223.5.5.5/resolve",
+    "https://dns.alidns.com/resolve",
+]
+
+# 被 geosite 标记为 @cn 的域名（含 Steam 国内 CDN），解析时额外查国内解析器
+CN_DOMAINS = set()
+
 # GFW DNS 污染的经典返回地址（A 记录）。命中这些的一律不当真。
 POISON_V4 = {
     "128.121.146.109", "8.7.198.45", "59.24.3.173", "203.98.7.65",
@@ -114,6 +125,37 @@ CRITICAL = {
     "store.steampowered.com", "steamcommunity.com", "api.steampowered.com",
     "cdn.akamai.steamstatic.com", "steamcdn-a.akamaihd.net",
     "www.gog.com", "gog.com", "launcher.epicgames.com", "www.epicgames.com",
+}
+
+# 必须存在的「精确主机名」。
+# geosite 的 domain:steampowered.com 只覆盖后缀语义，hosts 写不出子域，
+# 所以 store./api./launcher. 这些真正要用的主机名会整条缺席。这里显式补上。
+CRITICAL_HOSTS = {
+    # GitHub
+    "github.com", "api.github.com", "gist.github.com", "gist.githubusercontent.com",
+    "codeload.github.com", "raw.githubusercontent.com", "raw.github.com",
+    "objects.githubusercontent.com", "media.githubusercontent.com",
+    "github.githubassets.com", "avatars.githubusercontent.com",
+    "camo.githubusercontent.com", "user-images.githubusercontent.com",
+    "release-assets.githubusercontent.com", "uploads.github.com",
+    "github.io", "github.dev", "github.blog", "githubstatus.com",
+    # Steam
+    "store.steampowered.com", "api.steampowered.com", "help.steampowered.com",
+    "steamcommunity.com", "www.steamcommunity.com", "steam-chat.com",
+    "steamcdn-a.akamaihd.net", "cdn.akamai.steamstatic.com",
+    "store.akamai.steamstatic.com", "community.akamai.steamstatic.com",
+    "client-update.akamai.steamstatic.com", "cdn.cloudflare.steamstatic.com",
+    "media.steampowered.com", "cdn.steampowered.com", "repo.steampowered.com",
+    # Epic
+    "www.epicgames.com", "epicgames.com", "launcher.epicgames.com",
+    "download.epicgames.com", "store.epicgames.com", "api.epicgames.dev",
+    "epicgames.dev", "static-assets-prod.epicgames.com", "eac-cdn.com",
+    "easyanticheat.net", "unrealengine.com",
+    # GOG
+    "www.gog.com", "gog.com", "auth.gog.com", "www.gogalaxy.com",
+    "gameplay.gog.com", "remote-config.gog.com", "www4-static.gog-statics.com",
+    # 其它
+    "www.ubisoft.com",
 }
 
 CARRY_LIMIT = 7          # 连续多少轮探测不到才丢弃
@@ -540,7 +582,8 @@ def doh_near_many(hosts, workers=40, rtype="A"):
 
     def work(h):
         ips = []
-        for base in DOH_NEAR:
+        bases = list(DOH_NEAR) + (DOH_CN if h in CN_DOMAINS else [])
+        for base in bases:
             try:
                 for ip in _doh_try(h, rtype, base):
                     if ip not in ips:
@@ -590,14 +633,30 @@ GEOSITE_BASE = "https://raw.githubusercontent.com/v2fly/domain-list-community/ma
 
 
 _FETCH_STATE = {"raw_fail": 0}
+CACHE_DIR = ""          # 非空时，geosite 类别文件会缓存到本地（过夜跑省时间）
+
+
+def _cache_file(url):
+    import hashlib
+    h = hashlib.sha256(url.encode()).hexdigest()[:16]
+    return os.path.join(CACHE_DIR, h + ".dat")
 
 
 def _http_get_any(url, timeout=20, mirrors=2):
     """抓一个文件，失败时走镜像。
 
     直连 raw 在国内常被墙：失败 3 次后整轮不再尝试它，直接走镜像。
-    镜像首次可能慢（缓存未命中），所以镜像超时给足；并发靠调用方拉高。
+    给了 CACHE_DIR 时优先用 24 小时内的本地缓存，过夜跑第二轮会快很多。
     """
+    if CACHE_DIR:
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        p = _cache_file(url)
+        if os.path.exists(p) and (time.time() - os.path.getmtime(p)) < 86400:
+            try:
+                with open(p, "rb") as f:
+                    return f.read()
+            except Exception:  # noqa: BLE001
+                pass
     urls = mirror_urls(url)[: 1 + mirrors]
     if _FETCH_STATE["raw_fail"] >= 3 and urls and "raw.githubusercontent.com" in urls[0]:
         urls = urls[1:]
@@ -606,6 +665,12 @@ def _http_get_any(url, timeout=20, mirrors=2):
         try:
             data = http_get(u, timeout=6 if "raw.githubusercontent" in u else timeout)
             _FETCH_STATE["raw_fail"] = 0
+            if CACHE_DIR:
+                try:
+                    with open(_cache_file(url), "wb") as f:
+                        f.write(data)
+                except Exception:  # noqa: BLE001
+                    pass
             return data
         except Exception as e:  # noqa: BLE001
             if "raw.githubusercontent" in u:
@@ -614,17 +679,79 @@ def _http_get_any(url, timeout=20, mirrors=2):
     raise RuntimeError(f"fetch failed: {url} ({type(last).__name__})")
 
 
-def load_geosite(cats, workers=16, log=print):
+def read_domain_list(path):
+    """读纯文本域名清单（每行一个，# 注释），返回集合。"""
+    out = set()
+    if not path or not os.path.exists(path):
+        return out
+    with open(path, encoding="utf-8-sig") as f:
+        for line in f:
+            d = line.split("#", 1)[0].strip().strip(".").lower()
+            if d and HOST_RE.match(d):
+                out.add(d)
+    return out
+
+
+def load_manual_hosts(path):
+    """读手动 pin 的 IP：每行 `IP 域名`，返回 {domain: [ip, ...]}。"""
+    out = {}
+    if not path or not os.path.exists(path):
+        return out
+    with open(path, encoding="utf-8-sig") as f:
+        for raw in f:
+            line = raw.split("#", 1)[0].strip().replace("\t", " ")
+            if not line:
+                continue
+            parts = line.split()
+            if len(parts) < 2:
+                continue
+            ip, host = parts[0], parts[1].strip(".").lower()
+            if not HOST_RE.match(host):
+                continue
+            if not (usable_v4(ip) or usable_v6(ip)):
+                continue
+            out.setdefault(host, []).append(ip)
+    return out
+
+
+def extract_hostnames(text):
+    """只从 hosts 文本里提取域名（精确 FQDN），忽略它给的 IP。
+
+    geosite 给的是后缀语义，hosts 写不出子域；而这些 hosts 仓库里
+    恰好全是「人工/脚本写死的精确主机名」，两者天然互补。
+    """
+    out = set()
+    for raw in text.splitlines():
+        line = raw.split("#", 1)[0].strip().replace("\t", " ")
+        if not line:
+            continue
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+        head = parts[0]
+        if not ("." in head or ":" in head):   # 第一列不是 IP 就跳过
+            continue
+        for h in parts[1:]:
+            h = h.strip().strip(".").lower()
+            if HOST_RE.match(h):
+                out.add(h)
+    return out
+
+
+def load_geosite(cats, workers=16, log=print, include_cn=False):
     """按 v2fly/domain-list-community 的语法展开域名清单。
 
     - include:xxx        → 递归展开（按层并行抓取，否则上百个类别文件会非常慢）
-    - domain:xxx / xxx   → 后缀域名，取裸域名写 hosts
+    - domain:xxx / xxx   → 后缀域名，取裸域名写 hosts，并补一条 www.
     - full:xxx           → 精确域名
-    - @cn                → 中国专用（含国内 CDN），按要求**丢弃**
+    - @cn                → 中国专用域名（Steam 国内 CDN 等）。默认丢弃；
+                           include_cn=True 时保留，并记入 CN_DOMAINS，
+                           这些域名会额外用国内 DoH 解析（它们不被污染）。
     - regexp: / keyword: → 无法枚举成 hostname，跳过并计数
     """
     domains, skipped, seen, per_cat = set(), 0, set(), {}
     pending = set(cats)
+    cat_is_cn = {}
 
     def fetch_one(cat):
         try:
@@ -647,6 +774,7 @@ def load_geosite(cats, workers=16, log=print):
             if text is None:
                 log(f"[geosite] 跳过 {cat}（抓取失败）")
                 continue
+            cat_cn = cat_is_cn.get(cat, False)
             got = 0
             for line in text.splitlines():
                 line = line.split("#", 1)[0].strip()
@@ -654,30 +782,47 @@ def load_geosite(cats, workers=16, log=print):
                     continue
                 parts = line.split()
                 item, attrs = parts[0], parts[1:]
+                is_cn = cat_cn or ("@cn" in attrs)
                 if item.startswith("include:"):
-                    if "@cn" in attrs:
+                    if is_cn and not include_cn:
                         skipped += 1
                         continue
                     inc = item[len("include:"):]
+                    if is_cn:
+                        cat_is_cn[inc] = True
                     if inc not in seen:
                         pending.add(inc)
                     continue
                 if item.startswith(("regexp:", "keyword:")):
                     skipped += 1
                     continue
-                if "@cn" in attrs:
+                if is_cn and not include_cn:
                     skipped += 1
                     continue
                 if item.startswith("full:"):
                     d = item[5:]
+                    exact = True
                 elif item.startswith("domain:"):
                     d = item[7:]
+                    exact = False
                 else:
                     d = item
+                    exact = False
                 d = d.strip().strip(".").lower()
-                if HOST_RE.match(d):
-                    domains.add(d)
-                    got += 1
+                if not HOST_RE.match(d):
+                    continue
+                domains.add(d)
+                got += 1
+                if is_cn:
+                    CN_DOMAINS.add(d)
+                # geosite 的 domain: 语义是「本身 + 所有子域」，但 hosts 只能精确匹配。
+                # 至少补一个最常见的 www.，否则 www.x.com 仍然走被污染的 DNS。
+                if not exact and not d.startswith("www."):
+                    w = "www." + d
+                    if HOST_RE.match(w):
+                        domains.add(w)
+                        if is_cn:
+                            CN_DOMAINS.add(w)
             per_cat[cat] = got
     log(f"[geosite] 展开 {len(seen)} 个类别，{len(domains)} 个域名")
     return domains, skipped, per_cat
@@ -741,8 +886,20 @@ def main():
     ap.add_argument("--geosite", default="",
                     help="改用 geosite 域名库（逗号分隔的类别，如 steam,epicgames,gog,github,category-games,"
                          "geolocation-!cn）；给了这个就不再读 sources.txt")
+    ap.add_argument("--domain-sources", default="",
+                    help="额外从这些 hosts 仓库里只提取精确域名（忽略其 IP），格式同 sources.txt")
+    ap.add_argument("--domain-list", default="",
+                    help="纯文本域名清单（每行一个 FQDN，# 注释），通常是 crt.sh 枚举出的子域")
+    ap.add_argument("--manual-domains", default="manual-domains.txt",
+                    help="手动补充的域名清单，默认读 manual-domains.txt（存在即生效）")
+    ap.add_argument("--manual-hosts", default="manual-hosts.txt",
+                    help="手动 pin 的 IP（每行 `IP 域名`），默认读 manual-hosts.txt")
+    ap.add_argument("--cache-dir", default="",
+                    help="geosite 类别文件的本地缓存目录（过夜跑建议给 .cache）")
     ap.add_argument("--dry-run", action="store_true",
                     help="只汇总域名清单并打印统计，不做解析和探测")
+    ap.add_argument("--include-cn", action="store_true",
+                    help="保留 geosite 里 @cn 标记的域名（Steam 国内 CDN 等），并额外用国内 DoH 解析")
     ap.add_argument("--doctor", action="store_true",
                     help="只体检解析器：可达性、延迟、是否返回污染地址，然后退出")
     ap.add_argument("--doh-near", default="",
@@ -754,6 +911,10 @@ def main():
 
     started = time.time()
     os.makedirs(args.out, exist_ok=True)
+    if args.cache_dir:
+        global CACHE_DIR
+        CACHE_DIR = args.cache_dir
+        log(f"[cache] geosite 缓存目录: {CACHE_DIR}")
     if args.doh_near.strip():
         extra = [u.strip() for u in args.doh_near.split(",") if u.strip()]
         DOH_NEAR[:] = extra
@@ -764,8 +925,42 @@ def main():
     geosite_cats = [c.strip() for c in args.geosite.split(",") if c.strip()]
     if geosite_cats:
         # geosite 模式：不读 hosts 源，域名清单来自域名库，IP 全部靠 DoH 现解析
-        doms, skipped, per_cat = load_geosite(geosite_cats)
-        log(f"[geosite] 共 {len(doms)} 个域名（跳过 regexp/keyword/@cn {skipped} 条）")
+        doms, skipped, per_cat = load_geosite(geosite_cats, include_cn=args.include_cn)
+        # geosite 只有后缀语义，hosts 写不出子域；这些精确主机名必须显式补进来，
+        # 否则 store.steampowered.com / api.github.com 会整条缺席。
+        doms |= CRITICAL_HOSTS
+
+        # 再用 hosts 仓库补「精确 FQDN 长尾」：只取域名，不用它们给的 IP。
+        if args.domain_sources:
+            extra = read_sources(args.domain_sources)
+            log(f"[domains] 从 {len(extra)} 个 hosts 仓库补精确域名（忽略其中 IP）")
+            got_src = fetch_all(extra)
+            added = 0
+            for name, (_tier, text, _info) in got_src.items():
+                if not text:
+                    continue
+                new = extract_hostnames(text) - doms
+                doms |= new
+                added += len(new)
+                log(f"[domains]   {name:14} +{len(new):5d}")
+            log(f"[domains] 补入精确域名 {added} 个")
+
+        # 合并 crt.sh 枚举出来的子域清单
+        if args.domain_list:
+            n_before = len(doms)
+            doms |= read_domain_list(args.domain_list)
+            log(f"[domains] 从 {args.domain_list} 并入 {len(doms) - n_before} 个子域，"
+                f"当前共 {len(doms)}")
+
+        # 手动补充的域名：永远生效，优先级最高（用来补 geosite/仓库的覆盖缺口）
+        n_before = len(doms)
+        doms |= read_domain_list(args.manual_domains)
+        if len(doms) > n_before:
+            log(f"[manual] manual-domains 补入 {len(doms) - n_before} 个域名")
+
+        log(f"[geosite] 共 {len(doms)} 个域名"
+            + (f"（其中 @cn 国内域名 {len(CN_DOMAINS)} 个）" if CN_DOMAINS else "")
+            + f"，跳过 regexp/keyword/@cn {skipped} 条")
         if args.dry_run:
             sample = sorted(doms)[:20]
             log("[dry-run] 前 20 个域名: " + ", ".join(sample))
@@ -810,6 +1005,20 @@ def main():
         for d in cand:
             cand[d]["4"] = {}
         log("[mode] ignore-upstream-ip：忽略上游 IPv4，全部现解析")
+
+    # 手动 pin 的 IP：作为最高优先级候选（tier=0）。注意它仍然要过 TLS 证书校验，
+    # 校验不过就退回 DoH 现解析 —— 手动填的值不会被无条件采信。
+    manual = load_manual_hosts(args.manual_hosts)
+    if manual:
+        for d, ips in manual.items():
+            if d not in cand:
+                cand[d] = {"4": {}, "6": {}}
+            for ip in ips:
+                fam = "6" if ":" in ip else "4"
+                slot = cand[d][fam].setdefault(ip, {"srcs": set(), "tier": 0})
+                slot["srcs"].add("manual")
+                slot["tier"] = 0
+        log(f"[manual] manual-hosts 注入 {len(manual)} 个域名的指定 IP（仍会过证书校验）")
 
     # 3) 组装探测任务（把上一版的 IP 也当候选，用来判断它今天是否还活着）
     prev = load_prev(args.out)
@@ -1052,10 +1261,10 @@ def main():
             meta6[d] = {"ip": best[0], "status": "upstream-unverified",
                         "srcs": sorted(best[1]["srcs"])}
 
-    # v6 与 v4 保持「域名级一致」：IPv4 没活下来的域名，不单方面给它写一条 AAAA。
-    # 否则客户端会优先走 IPv6，而这条 v6 我们并没有验证过路径可达，可能比没有记录更糟。
-    # 例外是 V6_ALWAYS 里明确要保证的关键双栈域名。
-    orphan = [d for d in chosen6 if d not in chosen4 and d not in V6_ALWAYS]
+    # 硬规则：IPv4 没写成的域名，绝不单独写 AAAA。
+    # 否则客户端会优先走 IPv6，而这条 v6 我们并没有验证过路径可达，
+    # 表现就是「Ctrl+F 只看到一个 IPv6 地址」，比没有记录更糟。
+    orphan = [d for d in chosen6 if d not in chosen4]
     for d in orphan:
         chosen6.pop(d, None)
         meta6.pop(d, None)

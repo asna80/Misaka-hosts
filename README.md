@@ -145,6 +145,47 @@ nslookup www.gog.com 127.0.0.1        # 应同时看到 A 和 AAAA
 logread | tail -20                     # 看 dnsmasq 有没有报错
 ```
 
+## 手动补充：覆盖不到的地方自己加
+
+geosite 是后缀语义、hosts 只能精确匹配，覆盖缺口一定会有。留了两个手动通道，**放进仓库就自动生效，不用改代码、不用改 workflow**：
+
+| 文件 | 格式 | 作用 |
+|---|---|---|
+| `manual-domains.txt` | 每行一个域名 | 无条件并入域名清单，走 DoH 解析 + 证书探测 |
+| `manual-hosts.txt` | 每行 `IP 域名` | 把 IP 钉成**最高优先级候选**，但仍要过证书校验；不过就退回 DoH |
+
+```text
+# manual-domains.txt
+dl.example.com
+api.example.net
+```
+
+```text
+# manual-hosts.txt
+23.45.136.230  steamcommunity.com
+2a04:4e42::497 www.gog.com
+```
+
+`manual-hosts.txt` 里的 IP 若证书校验失败，**不会被写进去**，而是自动回退到 DoH 现解析——手动填错不会污染结果。
+
+## 子域枚举：什么时候需要，怎么跑
+
+geosite 的 `domain:x.com` 覆盖所有子域，但 hosts 写不出子域，所以像 `store.steampowered.com` 这种必须显式列。默认清单里已经硬编码了 53 个关键主机名（`CRITICAL_HOSTS`）。还有缺口时，用 `enum_subs.py` 从证书透明日志里挖：
+
+```sh
+python enum_subs.py --seeds seeds-platforms.txt --out subdomains.txt --cache .crtcache --workers 3
+```
+
+- `seeds-platforms.txt` 是 12 个平台（GitHub/Epic/Steam/Ubisoft/GOG/Docker/NVIDIA/AMD/Intel/Apple/Microsoft/OneDrive）的种子域名
+- **可断点续跑**：每查完一个种子就落盘，中断后重跑会跳过已完成的
+- 实测 crt.sh 单域名 20–110 秒，全部种子约 1–2 小时
+- 生成的 `subdomains.txt` 放进仓库，Action 会自动并入（内部走 `--domain-list`）
+
+注意：
+
+- 不要往种子里加 `github.io`、`azureedge.net`、`trafficmanager.net` 这类**公共后缀**——证书日志里有上百万条，会把枚举跑爆；
+- crt.sh 返回的通配符（`*.x.com`）会被丢弃，hosts 用不了。
+
 ## 保底策略做了什么（以及它的底线）
 
 记录不是「验证通过 / 丢弃」两档，中间有几层递减的保底。每一层的判据和风险如下：
