@@ -1,21 +1,30 @@
 # hosts-aggregator
 
-把 11 个上游 hosts 源合并成**一份自己验证过的 hosts 文件**，每天自动重建。你只需要订阅一条 URL。
+从 **geosite 域名库**取域名清单，用**香港/日本 DoH 现解析 + 证书探测**生成一份可用的 hosts 文件，每天自动重建。你只需要订阅一条 URL。
+
+## 数据源：geosite，不是 hosts 仓库
+
+域名清单来自 [v2fly/domain-list-community](https://github.com/v2fly/domain-list-community)，和你在 mosdns 里用的是同一套 `geosite` 数据：
+
+```sh
+python aggregate.py --geosite "geolocation-!cn,steam,epicgames,gog,github,category-games"
+```
+
+- `geolocation-!cn` 就是"没有中国大陆接入点"的完整海外域名集（内部 `include:` 会递归展开）；
+- `steam` / `epicgames` / `gog` / `github` / `category-games` 补上游戏与 GitHub 的精细分类；
+- **`@cn` 标记的条目全部丢弃**（Steam 国内 CDN 那些，如 `8686c.com`、`steamcontent.com` 的阿里云节点）——按你的要求，本来也连不上；
+- `regexp:` / `keyword:` 无法枚举成 hostname，跳过并计数。
+
+这样域名清单是"结构化、有分类、有人维护"的，而不是 2 万条混杂的加速表。
 
 ## 它解决的到底是什么问题
 
-多源合并真正难的不是去重，而是**「同域名不同 IP，留哪个」**。按上游的更新时间排序是不成立的：
-
-- 各源时间格式、时区都不一样（`+08:00` / `Z` / 只有日期 / 没有时区）；
-- `raw.githubusercontent.com` 有约 5 分钟 CDN 缓存，抓到的时间 ≠ 源更新时间；
-- 更关键的：**文件新 ≠ IP 对**。仓库的 CI 自己也可能解析到脏 IP。
-
-所以这里的判断依据不是时间，是**连通性**：
+同一个域名，先解析出一堆候选 IP，然后**只写那个真的能连的**：
 
 | 记录类型 | 判断方式 |
 |---|---|
 | IPv4 | 对每个候选 IP 做 `TCP:443 + SNI + 证书校验`，通过的才算数，多个通过取最快的 |
-| IPv6 | CI 环境没有 IPv6 出口，无法直连验证 → 用 DoH 交叉验证：只保留「当前权威 DNS 仍然返回这个 AAAA」的记录，上游遗留的过期 v6 会被丢弃 |
+| IPv6 | CI 环境没有 IPv6 出口，无法直连验证 → 用 DoH 交叉验证：只保留「当前解析器仍然返回这个 AAAA」的记录 |
 | 全部失败 | 沿用上一版的值，但**先确认上一版那个 IP 今天 TCP 还连得上**；连续 7 轮不通才丢弃 |
 
 ### IPv6 这一层为什么不直接信国内 DNS
@@ -27,13 +36,12 @@ www.google.com      AAAA → 2001::1                        # Teredo，GFW 伪�
 000webhost.com      AAAA → 2a03:2880:f10e:83:face:b00c:0:25de   # Facebook 网段，同样是伪造
 ```
 
-GFW 对 AAAA 查询同样会注入伪造应答，所以国内解析器（AliDNS）给出的 IPv6 **不能作为新记录的来源**。代码里的规则是：
+GFW 对 AAAA 查询同样会注入伪造应答，所以国内解析器（AliDNS）给出的 IPv6 **不能作为新记录的来源**（国内解析器已从默认配置里移除）。代码里的规则是：
 
 | 情况 | 处理 |
 |---|---|
-| 上游写了这个 AAAA，且解析器也能查到 | `verified`，保留 |
-| 上游没写，但**海外解析器**（Cloudflare / Google DoH）返回了这个 AAAA | `doh-refreshed`，采信 |
-| 上游没写，只有国内解析器返回 | 丢弃（无法排除伪造） |
+| 香港/日本/海外解析器返回这个 AAAA | `doh-refreshed` / `verified`，采信 |
+| 只有国内解析器返回 | 丢弃（无法排除伪造） |
 | 命中 `2001::/32`、`2002::/16`，或非 Facebook 域名命中 `2a03:2880::/32` | 一律当伪造丢弃 |
 
 另外每个域名最终只写 **1 个 IPv4 + 1 个 IPv6**。这是故意的：同族写多条，客户端通常只连第一条，坏 IP 会直接变成超时，比只写一条对的更糟。
@@ -61,14 +69,16 @@ GFW 对 AAAA 查询同样会注入伪造应答，所以国内解析器（AliDNS�
 ## 部署（不需要本地装 git）
 
 1. 新建一个 **public** 仓库（比如 `hosts`）。public 仓库的 Actions 免费。
-2. 用网页把这三个文件按原路径上传：
+2. 把这两个文件按原路径放上去：
    ```
    aggregate.py
-   sources.txt
    .github/workflows/build.yml
    ```
+   `sources.txt` 只有回退到「上游 hosts 源」模式时才需要，用 geosite 不用传。
 3. 仓库 **Settings → Actions → General → Workflow permissions** 选 **Read and write permissions**（否则 Action 无法提交结果）。
-4. **Actions → build-hosts → Run workflow** 手动跑一次，约 10–20 分钟。
+4. **Actions → build-hosts → Run workflow** 手动跑一次，参数留空即用默认：
+   域名 = `geolocation-!cn,steam,epicgames,gog,github,category-games`，
+   解析器 = `hk-hkg.doh.sb` + `jp-kix.doh.sb`（失败自动退 Cloudflare / Google）。
 5. 跑完后 `dist/hosts.txt` 就有了。
 
 ## 订阅地址

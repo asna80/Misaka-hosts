@@ -586,6 +586,103 @@ def load_prev(outdir):
 
 # ---------------------------------------------------------------- 主流程
 
+GEOSITE_BASE = "https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/"
+
+
+_FETCH_STATE = {"raw_fail": 0}
+
+
+def _http_get_any(url, timeout=20, mirrors=2):
+    """抓一个文件，失败时走镜像。
+
+    直连 raw 在国内常被墙：失败 3 次后整轮不再尝试它，直接走镜像。
+    镜像首次可能慢（缓存未命中），所以镜像超时给足；并发靠调用方拉高。
+    """
+    urls = mirror_urls(url)[: 1 + mirrors]
+    if _FETCH_STATE["raw_fail"] >= 3 and urls and "raw.githubusercontent.com" in urls[0]:
+        urls = urls[1:]
+    last = None
+    for u in urls:
+        try:
+            data = http_get(u, timeout=6 if "raw.githubusercontent" in u else timeout)
+            _FETCH_STATE["raw_fail"] = 0
+            return data
+        except Exception as e:  # noqa: BLE001
+            if "raw.githubusercontent" in u:
+                _FETCH_STATE["raw_fail"] += 1
+            last = e
+    raise RuntimeError(f"fetch failed: {url} ({type(last).__name__})")
+
+
+def load_geosite(cats, workers=16, log=print):
+    """按 v2fly/domain-list-community 的语法展开域名清单。
+
+    - include:xxx        → 递归展开（按层并行抓取，否则上百个类别文件会非常慢）
+    - domain:xxx / xxx   → 后缀域名，取裸域名写 hosts
+    - full:xxx           → 精确域名
+    - @cn                → 中国专用（含国内 CDN），按要求**丢弃**
+    - regexp: / keyword: → 无法枚举成 hostname，跳过并计数
+    """
+    domains, skipped, seen, per_cat = set(), 0, set(), {}
+    pending = set(cats)
+
+    def fetch_one(cat):
+        try:
+            raw = _http_get_any(GEOSITE_BASE + urllib.parse.quote(cat))
+            return cat, raw.decode("utf-8", "replace")
+        except Exception:  # noqa: BLE001
+            return cat, None
+
+    while pending:
+        batch = sorted(c for c in pending if c not in seen)
+        if not batch:
+            break
+        pending = set()
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            results = list(ex.map(fetch_one, batch))
+        failed = sum(1 for _c, t in results if t is None)
+        log(f"[geosite] 本层 {len(batch)} 个类别，失败 {failed}，累计域名 {len(domains)}")
+        for cat, text in results:
+            seen.add(cat)
+            if text is None:
+                log(f"[geosite] 跳过 {cat}（抓取失败）")
+                continue
+            got = 0
+            for line in text.splitlines():
+                line = line.split("#", 1)[0].strip()
+                if not line:
+                    continue
+                parts = line.split()
+                item, attrs = parts[0], parts[1:]
+                if item.startswith("include:"):
+                    if "@cn" in attrs:
+                        skipped += 1
+                        continue
+                    inc = item[len("include:"):]
+                    if inc not in seen:
+                        pending.add(inc)
+                    continue
+                if item.startswith(("regexp:", "keyword:")):
+                    skipped += 1
+                    continue
+                if "@cn" in attrs:
+                    skipped += 1
+                    continue
+                if item.startswith("full:"):
+                    d = item[5:]
+                elif item.startswith("domain:"):
+                    d = item[7:]
+                else:
+                    d = item
+                d = d.strip().strip(".").lower()
+                if HOST_RE.match(d):
+                    domains.add(d)
+                    got += 1
+            per_cat[cat] = got
+    log(f"[geosite] 展开 {len(seen)} 个类别，{len(domains)} 个域名")
+    return domains, skipped, per_cat
+
+
 DOCTOR_DOMAINS = [
     "store.steampowered.com", "www.gog.com", "github.com",
     "www.google.com", "www.youtube.com", "steamcommunity.com",
@@ -641,10 +738,15 @@ def main():
                     help="关闭「验证失败就用海外 DoH 现解析补位」")
     ap.add_argument("--ignore-upstream-ip", action="store_true",
                     help="忽略上游给的 IPv4，只把上游当域名清单（IPv4 全部用海外 DoH 现解析）")
+    ap.add_argument("--geosite", default="",
+                    help="改用 geosite 域名库（逗号分隔的类别，如 steam,epicgames,gog,github,category-games,"
+                         "geolocation-!cn）；给了这个就不再读 sources.txt")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="只汇总域名清单并打印统计，不做解析和探测")
     ap.add_argument("--doctor", action="store_true",
                     help="只体检解析器：可达性、延迟、是否返回污染地址，然后退出")
     ap.add_argument("--doh-near", default="",
-                    help="替换近端 DoH（逗号分隔），例如香港/日本节点；留空用内置 AliDNS+DNSPod")
+                    help="替换近端 DoH（逗号分隔），例如香港/日本节点；留空用内置 hk-hkg + jp-kix")
     ap.add_argument("--doh-workers", type=int, default=40)
     ap.add_argument("--min-domains", type=int, default=500,
                     help="合并后域名少于该值时视为异常，直接放弃本次构建（不覆盖线上文件）")
@@ -658,27 +760,48 @@ def main():
         log(f"[doh] 近端解析器已替换为: {', '.join(extra)}")
     if args.doctor:
         return doctor()
-    sources = read_sources(args.sources)
-    log(f"[init] {len(sources)} 个源，输出目录 {args.out}")
 
-    # 1) 抓取
-    fetched = fetch_all(sources)
-    ok_sources = {n for n, (t, txt, i) in fetched.items() if txt}
-    failed_sources = {n for n in fetched if n not in ok_sources}
-    if not ok_sources:
-        log("[fatal] 所有源都抓取失败，保留上一版不动")
-        return 2
+    geosite_cats = [c.strip() for c in args.geosite.split(",") if c.strip()]
+    if geosite_cats:
+        # geosite 模式：不读 hosts 源，域名清单来自域名库，IP 全部靠 DoH 现解析
+        doms, skipped, per_cat = load_geosite(geosite_cats)
+        log(f"[geosite] 共 {len(doms)} 个域名（跳过 regexp/keyword/@cn {skipped} 条）")
+        if args.dry_run:
+            sample = sorted(doms)[:20]
+            log("[dry-run] 前 20 个域名: " + ", ".join(sample))
+            return 0
+        if len(doms) < min(args.min_domains, 50) and not args.focus:
+            log(f"[fatal] geosite 域名数 {len(doms)} 少于阈值，放弃本次构建")
+            return 3
+        cand = {d: {"4": {}, "6": {}} for d in doms}
+        fetched = {}
+        sources = []
+        ok_sources = {"geosite"}
+        failed_sources = set()
+        per_source_stats = {"geosite": {"entries": len(doms), "cats": per_cat}}
+    else:
+        sources = read_sources(args.sources)
+        log(f"[init] {len(sources)} 个源，输出目录 {args.out}")
 
-    # 2) 解析
-    cand = {}
-    per_source_stats = {}
-    for name, (tier, text, info) in fetched.items():
-        if not text:
-            per_source_stats[name] = {"entries": 0, "ok": False}
-            continue
-        parse_source(text, name, tier, cand, per_source_stats)
+        # 1) 抓取
+        fetched = fetch_all(sources)
+        ok_sources = {n for n, (t, txt, i) in fetched.items() if txt}
+        failed_sources = {n for n in fetched if n not in ok_sources}
+        if not ok_sources:
+            log("[fatal] 所有源都抓取失败，保留上一版不动")
+            return 2
+
+        # 2) 解析
+        cand = {}
+        per_source_stats = {}
+        for name, (tier, text, info) in fetched.items():
+            if not text:
+                per_source_stats[name] = {"entries": 0, "ok": False}
+                continue
+            parse_source(text, name, tier, cand, per_source_stats)
+
     log(f"[parse] 合并后域名 {len(cand)} 个")
-    if len(cand) < args.min_domains and not args.focus:
+    if not geosite_cats and len(cand) < args.min_domains and not args.focus:
         log(f"[fatal] 域名数 {len(cand)} < {args.min_domains}，疑似上游异常，放弃本次构建")
         return 3
 
@@ -867,7 +990,11 @@ def main():
         stats4["critical-grace"] = stats4.get("critical-grace", 0) + 1
 
     # 5) 选 IPv6（无法探测，用 DoH 交叉验证）
-    v6_hosts = sorted({d for d in domains if cand[d]["6"]} | (V6_ALWAYS & set(domains)) | (V6_ALWAYS if args.limit == 0 else set()))
+    if geosite_cats:
+        # geosite 模式没有上游 v6 记录，全部靠 DoH 查 AAAA
+        v6_hosts = sorted(set(domains) | (V6_ALWAYS if args.limit == 0 else set()))
+    else:
+        v6_hosts = sorted({d for d in domains if cand[d]["6"]} | (V6_ALWAYS & set(domains)) | (V6_ALWAYS if args.limit == 0 else set()))
     log(f"[doh] 校验 {len(v6_hosts)} 个域名的 AAAA")
     doh = doh_many(v6_hosts, workers=args.doh_workers)
     chosen6, meta6 = {}, {}
@@ -937,10 +1064,18 @@ def main():
 
     # 6) 写文件
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    if geosite_cats:
+        src_note = "geosite: " + ",".join(geosite_cats)
+        stats_extra = {"geosite_cats": geosite_cats}
+    else:
+        src_note = (f"sources-ok: {len(ok_sources)}/{len(sources)}  "
+                    f"failed: {','.join(sorted(failed_sources)) or '-'}")
+        stats_extra = {"sources_total": len(sources), "sources_ok": sorted(ok_sources),
+                       "sources_failed": sorted(failed_sources)}
     lines = [
         "# hosts-aggregator build",
         f"# generated: {stamp}",
-        f"# sources-ok: {len(ok_sources)}/{len(sources)}  failed: {','.join(sorted(failed_sources)) or '-'}",
+        f"# {src_note}",
         f"# domains: {len(set(chosen4) | set(chosen6))}  ipv4: {len(chosen4)}  ipv6: {len(chosen6)}",
         "# policy: IPv4 = TLS(SNI+cert) verified; IPv6 = DoH cross-checked (CI 无 IPv6 出口，无法直连验证)",
         "# one IPv4 + one IPv6 per domain on purpose (多写几条会让客户端死等坏 IP)",
@@ -972,9 +1107,7 @@ def main():
     # 8) 状态与上一版快照
     stats = {
         "generated": stamp,
-        "sources_total": len(sources),
-        "sources_ok": sorted(ok_sources),
-        "sources_failed": sorted(failed_sources),
+        **stats_extra,
         "domains": len(set(chosen4) | set(chosen6)),
         "ipv4": len(chosen4),
         "ipv6": len(chosen6),
