@@ -1,12 +1,16 @@
 name: build-hosts
 
 # 每天北京时间 04:17 重建一次（UTC 20:17）。
-# 上游 zy-xyz 的 accelerate.txt 每晚 21:41 左右更新，这个时间点拿到的已是最新版本。
+# 域名清单来自 v2fly/domain-list-community（geosite），IP 由香港/日本 DoH 现解析 + 证书探测。
 on:
   schedule:
     - cron: "17 20 * * *"
   workflow_dispatch:
     inputs:
+      geosite:
+        description: "geosite 类别（逗号分隔）；留空用默认：geolocation-!cn,steam,epicgames,gog,github,category-games"
+        required: false
+        default: ""
       doh_near:
         description: "近端 DoH（逗号分隔）；留空用内置 hk-hkg + jp-kix"
         required: false
@@ -23,7 +27,6 @@ on:
     branches: [main]
     paths:
       - "aggregate.py"
-      - "sources.txt"
       - ".github/workflows/build.yml"
 
 permissions:
@@ -32,6 +35,10 @@ permissions:
 concurrency:
   group: build-hosts
   cancel-in-progress: false
+
+env:
+  # 默认域名清单：海外全家桶 + 四个刚需类别
+  DEFAULT_GEOSITE: "geolocation-!cn,steam,epicgames,gog,github,category-games"
 
 jobs:
   build:
@@ -61,11 +68,14 @@ jobs:
         env:
           PYTHONUNBUFFERED: "1"
           DOH_NEAR: ${{ github.event.inputs.doh_near }}
+          GEOSITE: ${{ github.event.inputs.geosite }}
         run: |
-          ARGS="--out dist --concurrency 256 --max-probe ${{ github.event.inputs.max_probe || 6 }} --max-seconds ${{ github.event.inputs.max_seconds || 2400 }}"
+          CATS="${GEOSITE:-$DEFAULT_GEOSITE}"
+          ARGS="--out dist --geosite $CATS --concurrency 256 --max-probe ${{ github.event.inputs.max_probe || 6 }} --max-seconds ${{ github.event.inputs.max_seconds || 2400 }}"
           if [ -n "$DOH_NEAR" ]; then
             ARGS="$ARGS --doh-near $DOH_NEAR"
           fi
+          echo "运行参数: $ARGS"
           python aggregate.py $ARGS
 
       - name: Summary
