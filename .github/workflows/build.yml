@@ -23,6 +23,10 @@ on:
         description: "探测阶段时间预算（秒）"
         required: false
         default: "2400"
+      include_cn:
+        description: "保留 @cn 国内域名（Steam 国内 CDN）：true/false"
+        required: false
+        default: "false"
   push:
     branches: [main]
     paths:
@@ -37,8 +41,9 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # 默认域名清单：海外全家桶 + 四个刚需类别
-  DEFAULT_GEOSITE: "geolocation-!cn,steam,epicgames,gog,github,category-games"
+  # 默认域名清单：全量海外 + 四个刚需类别
+  # 用 category-games-!cn 而不要 category-games，后者会带上 17173/37.com 这类国内站
+  DEFAULT_GEOSITE: "geolocation-!cn,steam,epicgames,gog,github,category-games-!cn"
 
 jobs:
   build:
@@ -72,9 +77,20 @@ jobs:
         run: |
           CATS="${GEOSITE:-$DEFAULT_GEOSITE}"
           ARGS="--out dist --geosite $CATS --concurrency 256 --max-probe ${{ github.event.inputs.max_probe || 6 }} --max-seconds ${{ github.event.inputs.max_seconds || 2400 }}"
+          if [ "${{ github.event.inputs.include_cn }}" = "true" ]; then
+            ARGS="$ARGS --include-cn"
+          fi
           if [ -n "$DOH_NEAR" ]; then
             ARGS="$ARGS --doh-near $DOH_NEAR"
           fi
+          if [ -f domains.txt ]; then
+            ARGS="$ARGS --domain-sources domains.txt"
+          fi
+          # 你自己用 enum_subs.py 枚举出来的子域，放进仓库后会自动并入
+          if [ -f subdomains.txt ]; then
+            ARGS="$ARGS --domain-list subdomains.txt"
+          fi
+          # manual-domains.txt / manual-hosts.txt 是默认路径，存在即生效，不用传参
           echo "运行参数: $ARGS"
           python aggregate.py $ARGS
 
