@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-06T13:00:20Z",
+  "generated": "2026-11-06T14:26:27Z",
   "sources_total": 11,
   "sources_ok": [
     "caibingcheng",
@@ -15,34 +15,34 @@
     "zyxyz"
   ],
   "sources_failed": [],
-  "domains": 19197,
-  "ipv4": 19196,
-  "ipv6": 9000,
+  "domains": 19219,
+  "ipv4": 19218,
+  "ipv6": 9015,
   "status4": {
-    "verified": 18560,
-    "tier1-grace": 50,
-    "doh-near-verified": 586
+    "verified": 19086,
+    "carried": 81,
+    "doh-near-verified": 51
   },
   "v4_detail": {
-    "verified": 18560,
-    "tier1-grace": 50,
-    "carried": 0,
+    "verified": 19086,
+    "tier1-grace": 0,
+    "carried": 81,
     "cert-mismatch": 0,
     "doh-resolved": 0,
     "critical-grace": 0,
-    "dropped": 4828,
-    "drop_ip_unreachable": 2035,
-    "drop_tcp_open_no_tls": 2793,
-    "doh-near-verified": 586
+    "dropped": 4271,
+    "drop_ip_unreachable": 1808,
+    "drop_tcp_open_no_tls": 2463,
+    "doh-near-verified": 51
   },
   "status6": {
-    "doh-refreshed": 8568,
-    "verified": 432
+    "verified": 8073,
+    "doh-refreshed": 942
   },
   "v6_detail": {
-    "matched_upstream": 470,
-    "refreshed_by_trusted_doh": 8872,
-    "dropped_stale": 221,
+    "matched_upstream": 8114,
+    "refreshed_by_trusted_doh": 1247,
+    "dropped_stale": 202,
     "unconfirmed_cn_only": 0,
     "doh_failed": 0
   },
@@ -81,5 +81,5 @@
       "entries": 64559
     }
   },
-  "elapsed_sec": 367.3
+  "elapsed_sec": 359.8
 }
