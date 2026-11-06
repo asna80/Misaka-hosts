@@ -1,0 +1,97 @@
+name: build-hosts
+
+# 每天北京时间 04:17 重建一次（UTC 20:17）。
+# 上游 zy-xyz 的 accelerate.txt 每晚 21:41 左右更新，这个时间点拿到的已是最新版本。
+on:
+  schedule:
+    - cron: "17 20 * * *"
+  workflow_dispatch:
+    inputs:
+      doh_near:
+        description: "近端 DoH（逗号分隔）；留空用内置 hk-hkg + jp-kix"
+        required: false
+        default: ""
+      max_probe:
+        description: "每个域名最多探测几个 IPv4 候选"
+        required: false
+        default: "6"
+      max_seconds:
+        description: "探测阶段时间预算（秒）"
+        required: false
+        default: "2400"
+  push:
+    branches: [main]
+    paths:
+      - "aggregate.py"
+      - "sources.txt"
+      - ".github/workflows/build.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-hosts
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # 先体检解析器：能不能连、有没有污染、Steam/GOG 拿到的是不是亚太边缘。
+      # 失败不阻断构建，但会留在日志里，方便判断该换哪个 DoH。
+      - name: Resolver doctor
+        continue-on-error: true
+        env:
+          DOH_NEAR: ${{ github.event.inputs.doh_near }}
+        run: |
+          if [ -n "$DOH_NEAR" ]; then
+            python aggregate.py --doctor --doh-near "$DOH_NEAR"
+          else
+            python aggregate.py --doctor
+          fi
+
+      - name: Build hosts
+        env:
+          PYTHONUNBUFFERED: "1"
+          DOH_NEAR: ${{ github.event.inputs.doh_near }}
+        run: |
+          ARGS="--out dist --concurrency 256 --max-probe ${{ github.event.inputs.max_probe || 6 }} --max-seconds ${{ github.event.inputs.max_seconds || 2400 }}"
+          if [ -n "$DOH_NEAR" ]; then
+            ARGS="$ARGS --doh-near $DOH_NEAR"
+          fi
+          python aggregate.py $ARGS
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ -f dist/stats.json ]; then
+            echo '### 本次构建' >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat dist/stats.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "hosts 行数: $(wc -l < dist/hosts.txt)" >> "$GITHUB_STEP_SUMMARY"
+            echo "### 关键域名" >> "$GITHUB_STEP_SUMMARY"
+            grep -E "(github\.com|store\.steampowered\.com|www\.gog\.com|epicgames\.com)$" dist/hosts.txt \
+              >> "$GITHUB_STEP_SUMMARY" || echo "（有缺失）" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "没有生成 stats.json（构建失败）" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Commit dist
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A dist
+          if git diff --cached --quiet; then
+            echo "内容无变化，跳过提交"
+            exit 0
+          fi
+          git commit -m "chore: rebuild hosts $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
+          git push
