@@ -1,0 +1,85 @@
+{
+  "generated": "2026-11-06T13:00:20Z",
+  "sources_total": 11,
+  "sources_ok": [
+    "caibingcheng",
+    "github520",
+    "ianzone",
+    "ineo6",
+    "ittuann",
+    "johyC",
+    "maxiaof",
+    "rocdk890",
+    "steamhostsync",
+    "varcli",
+    "zyxyz"
+  ],
+  "sources_failed": [],
+  "domains": 19197,
+  "ipv4": 19196,
+  "ipv6": 9000,
+  "status4": {
+    "verified": 18560,
+    "tier1-grace": 50,
+    "doh-near-verified": 586
+  },
+  "v4_detail": {
+    "verified": 18560,
+    "tier1-grace": 50,
+    "carried": 0,
+    "cert-mismatch": 0,
+    "doh-resolved": 0,
+    "critical-grace": 0,
+    "dropped": 4828,
+    "drop_ip_unreachable": 2035,
+    "drop_tcp_open_no_tls": 2793,
+    "doh-near-verified": 586
+  },
+  "status6": {
+    "doh-refreshed": 8568,
+    "verified": 432
+  },
+  "v6_detail": {
+    "matched_upstream": 470,
+    "refreshed_by_trusted_doh": 8872,
+    "dropped_stale": 221,
+    "unconfirmed_cn_only": 0,
+    "doh_failed": 0
+  },
+  "per_source_entries": {
+    "johyC": {
+      "entries": 424
+    },
+    "rocdk890": {
+      "entries": 552
+    },
+    "ianzone": {
+      "entries": 242
+    },
+    "varcli": {
+      "entries": 58
+    },
+    "steamhostsync": {
+      "entries": 67
+    },
+    "github520": {
+      "entries": 40
+    },
+    "ineo6": {
+      "entries": 32
+    },
+    "maxiaof": {
+      "entries": 37
+    },
+    "ittuann": {
+      "entries": 177
+    },
+    "caibingcheng": {
+      "entries": 123
+    },
+    "zyxyz": {
+      "entries": 64559
+    }
+  },
+  "elapsed_sec": 367.3
+}
