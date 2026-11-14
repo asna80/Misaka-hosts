@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-13T02:03:48Z",
+  "generated": "2026-11-14T01:48:13Z",
   "geosite_cats": [
     "geolocation-!cn",
     "steam",
@@ -8,33 +8,33 @@
     "github",
     "category-games-!cn"
   ],
-  "domains": 45371,
-  "ipv4": 45371,
-  "ipv6": 20083,
+  "domains": 45432,
+  "ipv4": 45432,
+  "ipv6": 20107,
   "status4": {
-    "doh-near-verified": 45364,
-    "doh-resolved": 7
+    "doh-near-verified": 45423,
+    "doh-resolved": 9
   },
   "v4_detail": {
     "verified": 0,
     "tier1-grace": 0,
     "carried": 0,
     "cert-mismatch": 0,
-    "doh-resolved": 7,
+    "doh-resolved": 9,
     "critical-grace": 0,
     "dropped": 0,
-    "doh-near-verified": 45364
+    "doh-near-verified": 45423
   },
   "status6": {
-    "verified": 15812,
-    "doh-refreshed": 4271
+    "verified": 16687,
+    "doh-refreshed": 3420
   },
   "v6_detail": {
-    "matched_upstream": 15841,
-    "refreshed_by_trusted_doh": 5656,
-    "dropped_stale": 48200,
+    "matched_upstream": 16698,
+    "refreshed_by_trusted_doh": 4792,
+    "dropped_stale": 48215,
     "unconfirmed_cn_only": 0,
-    "doh_failed": 18
+    "doh_failed": 10
   },
   "per_source_entries": {
     "geosite": {
@@ -1127,5 +1127,5 @@
       }
     }
   },
-  "elapsed_sec": 3170.7
+  "elapsed_sec": 3193.6
 }
