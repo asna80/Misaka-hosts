@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-15T00:48:53Z",
+  "generated": "2026-11-16T00:47:45Z",
   "geosite_cats": [
     "geolocation-!cn",
     "steam",
@@ -8,37 +8,37 @@
     "github",
     "category-games-!cn"
   ],
-  "domains": 45423,
-  "ipv4": 45423,
-  "ipv6": 20084,
+  "domains": 45325,
+  "ipv4": 45325,
+  "ipv6": 20074,
   "status4": {
-    "doh-near-verified": 45418,
-    "doh-resolved": 5
+    "doh-near-verified": 45318,
+    "doh-resolved": 7
   },
   "v4_detail": {
     "verified": 0,
     "tier1-grace": 0,
     "carried": 0,
     "cert-mismatch": 0,
-    "doh-resolved": 5,
+    "doh-resolved": 7,
     "critical-grace": 0,
     "dropped": 0,
-    "doh-near-verified": 45418
+    "doh-near-verified": 45318
   },
   "status6": {
-    "verified": 16021,
-    "doh-refreshed": 4063
+    "verified": 15898,
+    "doh-refreshed": 4176
   },
   "v6_detail": {
-    "matched_upstream": 16043,
-    "refreshed_by_trusted_doh": 5439,
-    "dropped_stale": 48213,
+    "matched_upstream": 15912,
+    "refreshed_by_trusted_doh": 5569,
+    "dropped_stale": 48227,
     "unconfirmed_cn_only": 0,
-    "doh_failed": 20
+    "doh_failed": 14
   },
   "per_source_entries": {
     "geosite": {
-      "entries": 69715,
+      "entries": 69722,
       "cats": {
         "category-games-!cn": 39,
         "epicgames": 28,
@@ -81,7 +81,7 @@
         "category-communication": 1,
         "category-companies": 3,
         "category-consent-management": 14,
-        "category-cryptocurrency": 96,
+        "category-cryptocurrency": 97,
         "category-dev": 125,
         "category-ecommerce": 19,
         "category-enhance-gaming": 5,
@@ -710,7 +710,7 @@
         "metacritic": 1,
         "metart": 5,
         "microsoft": 256,
-        "microsoft-dev": 72,
+        "microsoft-dev": 75,
         "microsoft-pki": 6,
         "mikrotik": 4,
         "mindbox": 22,
@@ -833,7 +833,7 @@
         "redis": 2,
         "redotpay": 5,
         "regru": 3,
-        "remnawave": 4,
+        "remnawave": 5,
         "rferl": 30,
         "rockstar": 7,
         "roku": 6,
@@ -1127,5 +1127,5 @@
       }
     }
   },
-  "elapsed_sec": 3039.1
+  "elapsed_sec": 2879.2
 }
