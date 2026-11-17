@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-16T00:47:45Z",
+  "generated": "2026-11-17T03:50:05Z",
   "geosite_cats": [
     "geolocation-!cn",
     "steam",
@@ -8,37 +8,37 @@
     "github",
     "category-games-!cn"
   ],
-  "domains": 45325,
-  "ipv4": 45325,
-  "ipv6": 20074,
+  "domains": 45438,
+  "ipv4": 45438,
+  "ipv6": 20107,
   "status4": {
-    "doh-near-verified": 45318,
-    "doh-resolved": 7
+    "doh-near-verified": 45430,
+    "doh-resolved": 8
   },
   "v4_detail": {
     "verified": 0,
     "tier1-grace": 0,
     "carried": 0,
     "cert-mismatch": 0,
-    "doh-resolved": 7,
+    "doh-resolved": 8,
     "critical-grace": 0,
     "dropped": 0,
-    "doh-near-verified": 45318
+    "doh-near-verified": 45430
   },
   "status6": {
-    "verified": 15898,
-    "doh-refreshed": 4176
+    "verified": 15878,
+    "doh-refreshed": 4229
   },
   "v6_detail": {
-    "matched_upstream": 15912,
-    "refreshed_by_trusted_doh": 5569,
-    "dropped_stale": 48227,
+    "matched_upstream": 15889,
+    "refreshed_by_trusted_doh": 5593,
+    "dropped_stale": 48224,
     "unconfirmed_cn_only": 0,
-    "doh_failed": 14
+    "doh_failed": 22
   },
   "per_source_entries": {
     "geosite": {
-      "entries": 69722,
+      "entries": 69728,
       "cats": {
         "category-games-!cn": 39,
         "epicgames": 28,
@@ -115,7 +115,7 @@
         "coursera": 4,
         "curseforge": 2,
         "cuttly": 1,
-        "cygames": 5,
+        "cygames": 6,
         "decryptipastore": 1,
         "demonoid": 1,
         "disqus": 4,
@@ -414,7 +414,7 @@
         "category-bank-ir": 32,
         "category-bank-jp": 84,
         "category-bank-mm": 30,
-        "category-bank-ru": 226,
+        "category-bank-ru": 228,
         "category-container": 9,
         "category-ecommerce-ru": 2,
         "category-entertainment-ru": 17,
@@ -999,7 +999,7 @@
         "xtom": 12,
         "xvideos": 5,
         "yahoo": 170,
-        "yandex": 150,
+        "yandex": 151,
         "yomiuri": 13,
         "youjizz": 2,
         "youmind": 3,
@@ -1127,5 +1127,5 @@
       }
     }
   },
-  "elapsed_sec": 2879.2
+  "elapsed_sec": 3090.5
 }
