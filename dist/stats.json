@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-20T02:33:19Z",
+  "generated": "2026-11-22T01:10:26Z",
   "geosite_cats": [
     "geolocation-!cn",
     "steam",
@@ -8,37 +8,37 @@
     "github",
     "category-games-!cn"
   ],
-  "domains": 45458,
-  "ipv4": 45458,
-  "ipv6": 20127,
+  "domains": 45461,
+  "ipv4": 45461,
+  "ipv6": 20106,
   "status4": {
-    "doh-near-verified": 45449,
-    "doh-resolved": 9
+    "doh-near-verified": 45444,
+    "doh-resolved": 17
   },
   "v4_detail": {
     "verified": 0,
     "tier1-grace": 0,
     "carried": 0,
     "cert-mismatch": 0,
-    "doh-resolved": 9,
+    "doh-resolved": 17,
     "critical-grace": 0,
     "dropped": 0,
-    "doh-near-verified": 45449
+    "doh-near-verified": 45444
   },
   "status6": {
-    "verified": 15925,
-    "doh-refreshed": 4202
+    "verified": 16435,
+    "doh-refreshed": 3671
   },
   "v6_detail": {
-    "matched_upstream": 15941,
-    "refreshed_by_trusted_doh": 5564,
-    "dropped_stale": 48219,
+    "matched_upstream": 16444,
+    "refreshed_by_trusted_doh": 5033,
+    "dropped_stale": 48022,
     "unconfirmed_cn_only": 0,
-    "doh_failed": 3
+    "doh_failed": 12
   },
   "per_source_entries": {
     "geosite": {
-      "entries": 69727,
+      "entries": 69511,
       "cats": {
         "category-games-!cn": 39,
         "epicgames": 28,
@@ -82,7 +82,7 @@
         "category-companies": 3,
         "category-consent-management": 14,
         "category-cryptocurrency": 97,
-        "category-dev": 125,
+        "category-dev": 126,
         "category-ecommerce": 19,
         "category-enhance-gaming": 5,
         "category-entertainment": 70,
@@ -94,7 +94,7 @@
         "category-ntp": 65,
         "category-orgs": 15,
         "category-password-management": 9,
-        "category-porn": 5971,
+        "category-porn": 5953,
         "category-proxy-tunnels": 0,
         "category-scholar-!cn": 174,
         "category-social-media-!cn": 7,
@@ -347,7 +347,7 @@
         "apkcombo": 1,
         "apkmirror": 2,
         "apkpure": 6,
-        "apple": 650,
+        "apple": 648,
         "apple-dev": 31,
         "apple-music": 11,
         "apple-pki": 0,
@@ -446,7 +446,7 @@
         "cloudcone": 4,
         "cloudflare": 55,
         "clubhouse": 3,
-        "cnbc": 4,
+        "cnbc": 3,
         "cnbeta": 3,
         "cnn": 9,
         "codeberg": 2,
@@ -488,7 +488,7 @@
         "dlsite": 10,
         "dmit": 2,
         "dmm": 15,
-        "dmm-porn": 2,
+        "dmm-porn": 3,
         "docker": 6,
         "doi": 2,
         "dropbox": 25,
@@ -579,7 +579,7 @@
         "groq": 1,
         "group-ib": 30,
         "gucci": 5,
-        "guo": 21,
+        "guo": 19,
         "habr": 2,
         "haitang": 17,
         "hamivideo": 19,
@@ -745,7 +745,7 @@
         "n26": 3,
         "n3ro": 3,
         "naver": 30,
-        "nbcuniversal": 17,
+        "nbcuniversal": 33,
         "neowin": 2,
         "netflav": 3,
         "netflix": 24,
@@ -803,7 +803,7 @@
         "pinggy": 2,
         "pixiv": 11,
         "pixnet": 9,
-        "playboy": 2,
+        "playboy": 3,
         "plex": 4,
         "plutotv": 2,
         "pocketcasts": 2,
@@ -1025,7 +1025,7 @@
         "azure": 64,
         "bamtech": 3,
         "barrons": 4,
-        "beats": 709,
+        "beats": 581,
         "bing": 32,
         "brazzers": 5,
         "cabletv": 5,
@@ -1127,5 +1127,5 @@
       }
     }
   },
-  "elapsed_sec": 2740.0
+  "elapsed_sec": 2716.3
 }
