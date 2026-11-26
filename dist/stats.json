@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-24T05:42:40Z",
+  "generated": "2026-11-26T03:46:22Z",
   "geosite_cats": [
     "geolocation-!cn",
     "steam",
@@ -8,41 +8,42 @@
     "github",
     "category-games-!cn"
   ],
-  "domains": 45416,
-  "ipv4": 45416,
-  "ipv6": 20131,
+  "domains": 45411,
+  "ipv4": 45411,
+  "ipv6": 20090,
   "status4": {
     "doh-near-verified": 45400,
-    "doh-resolved": 16
+    "doh-resolved": 11
   },
   "v4_detail": {
     "verified": 0,
     "tier1-grace": 0,
     "carried": 0,
     "cert-mismatch": 0,
-    "doh-resolved": 16,
+    "doh-resolved": 11,
     "critical-grace": 0,
     "dropped": 0,
     "doh-near-verified": 45400
   },
   "status6": {
-    "verified": 15886,
-    "doh-refreshed": 4245
+    "verified": 16142,
+    "doh-refreshed": 3947,
+    "carried": 1
   },
   "v6_detail": {
-    "matched_upstream": 15897,
-    "refreshed_by_trusted_doh": 5585,
-    "dropped_stale": 48016,
+    "matched_upstream": 16160,
+    "refreshed_by_trusted_doh": 5290,
+    "dropped_stale": 48085,
     "unconfirmed_cn_only": 0,
-    "doh_failed": 15
+    "doh_failed": 12
   },
   "per_source_entries": {
     "geosite": {
-      "entries": 69513,
+      "entries": 69547,
       "cats": {
         "category-games-!cn": 39,
         "epicgames": 28,
-        "geolocation-!cn": 39,
+        "geolocation-!cn": 40,
         "github": 56,
         "gog": 7,
         "steam": 44,
@@ -472,7 +473,7 @@
         "dart": 3,
         "dazn": 8,
         "dcard": 4,
-        "debian": 2,
+        "debian": 3,
         "deezer": 2,
         "dell": 202,
         "deribit": 2,
@@ -526,7 +527,7 @@
         "farfetch": 5,
         "faronics": 18,
         "fastlane": 2,
-        "fastly": 7,
+        "fastly": 9,
         "fedora": 6,
         "fflogs": 2,
         "fibank": 3,
@@ -703,7 +704,7 @@
         "mediachinesegroup": 21,
         "medium": 2,
         "mega": 7,
-        "megafon": 12,
+        "megafon": 17,
         "messenger": 4,
         "meta": 7,
         "metabrainz": 8,
@@ -732,7 +733,7 @@
         "moxing": 2,
         "mozilla": 60,
         "msi": 2,
-        "mts-ru": 13,
+        "mts-ru": 15,
         "mubi": 2,
         "mucinex": 8,
         "mudvod": 10,
@@ -765,7 +766,7 @@
         "nikkan-gendai": 2,
         "nikkei": 6,
         "nist": 2,
-        "nixos": 12,
+        "nixos": 13,
         "nodeseek": 7,
         "nordstrom": 2,
         "nordvpn": 2,
@@ -838,7 +839,7 @@
         "rockstar": 7,
         "roku": 6,
         "rossiyasegodnya": 18,
-        "rostelecom": 4,
+        "rostelecom": 8,
         "rt": 112,
         "rthk": 2,
         "ruby": 2,
@@ -951,7 +952,7 @@
         "ucoz": 37,
         "udn": 4,
         "unext": 4,
-        "unity": 10,
+        "unity": 11,
         "usersdrive": 2,
         "uu-chat": 22,
         "v2ray": 3,
@@ -1127,5 +1128,5 @@
       }
     }
   },
-  "elapsed_sec": 3147.3
+  "elapsed_sec": 3151.3
 }
